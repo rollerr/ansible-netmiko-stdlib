@@ -91,6 +91,7 @@ try:
 except ImportError:
     MEETS_REQUIREMENTS = False
 
+
 def get_config(dev):
     """Returns the current configuration of an IOS-like device that supports
     `show running-config`
@@ -202,5 +203,8 @@ def main():
 
     load(module)
 
+
 from ansible.module_utils.basic import *
-main()
+
+if __name__ == "__main__":
+    main()

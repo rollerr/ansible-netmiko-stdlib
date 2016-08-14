@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+from importlib import import_module
 import logging
 import os
 
@@ -50,15 +52,19 @@ def main():
             device_type=dict(required=False, default='cisco_ios'),
             log_file=dict(required=False, default=None),
             key_file=dict(required=False, default=None),
+            validation_args=dict(required=False, default=None),
+            validate_module=dict(required=False, default=None),
             command=dict(required=True)
         ),
         supports_check_mode=False)
 
     if not MEETS_REQUIREMENTS:
         module.fail_json(msg='netmiko >= 0.1.3 is required for this module')
-        return
+        exit(1)
 
     args = module.params
+    setup_logging(args)
+    logging.info('here we be {}'.format(args))
     warnings = []
     dev_params = {"device_type": args['device_type'],
                   "ip": args['host'],
@@ -67,14 +73,33 @@ def main():
                   "key_file": args['key_file'],
                   "verbose": False}
 
-    setup_logging(args)
+
 
     logging.info("connecting to {}.\nParameters:{}".format(args['host'], dev_params))
     netmiko_object = setup_netmiko_connection(dev_params)
-    stdout = execute_show_command(netmiko_object, args['command'])
+    # snmp validation?
+    device_output = execute_show_command(netmiko_object, args['command'])
+
+    if args['validate_module']:
+        logging.info('args: {} {}'.format(args['validation_args'], args['validate_module']))
+        run_validator = load_validator(args['validate_module'])
+        run_validator(args['validation_args'], device_output)
 
     result = dict(changed=False, warnings=warnings, stdout_lines=stdout)
     module.exit_json(**result)
+
+
+def load_validator(validate_module):
+    folder, library, method = validate_module.split('.')
+    logging.info('{} {} {}'.format(folder, library, method))
+    import sys
+    logging.info(sys.path)
+    try:
+        library = import_module('{}.{}'.format(folder, library))
+        return library.method
+    except ImportError as e:
+        logging.error('{} does not exist: {}'.format(validate_module, e))
+        exit(1)
 
 
 from ansible.module_utils.basic import *

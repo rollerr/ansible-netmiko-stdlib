@@ -85,18 +85,16 @@ def main():
         run_validator = load_validator(args['validate_module'])
         run_validator(args['validation_args'], device_output)
 
-    result = dict(changed=False, warnings=warnings, stdout_lines=stdout)
+    result = dict(changed=False, warnings=warnings, stdout_lines=device_output)
     module.exit_json(**result)
 
 
 def load_validator(validate_module):
     folder, library, method = validate_module.split('.')
     logging.info('{} {} {}'.format(folder, library, method))
-    import sys
-    logging.info(sys.path)
     try:
-        library = import_module('{}.{}'.format(folder, library))
-        return library.method
+        library = import_module('parse_checks.{}.{}'.format(folder, library))
+        return getattr(library, method)
     except ImportError as e:
         logging.error('{} does not exist: {}'.format(validate_module, e))
         exit(1)

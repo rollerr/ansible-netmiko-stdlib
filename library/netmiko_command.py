@@ -113,7 +113,7 @@ def main():
         dev_params['ip'] = host
         logging.info("connecting to {}.\nParameters:{}".format(host, dev_params))
         netmiko_object = setup_netmiko_connection(dev_params)
-        device_output += '\n' + execute_show_command(netmiko_object, args['command'])
+        device_output_dict[host] = execute_show_command(netmiko_object, args['command'])
 
     logging.info('Final output: {}'.format(device_output))
 
@@ -125,10 +125,10 @@ def main():
         if args['validation_args'].get('csv_file'):
             validation_args = load_csv_into_array(validation_args['csv_file'])
 
-        if run_validator(validation_args, device_output):
+        if run_validator(validation_args, device_output_dict):
             module.exit_json(changed=True, msg='All passed, should customize')
 
-    result = dict(changed=False, warnings=warnings, stdout_lines=device_output)
+    result = dict(changed=False, warnings=warnings, stdout_lines=device_output_dict)
     module.exit_json(**result)
 
 

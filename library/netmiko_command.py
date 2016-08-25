@@ -2,7 +2,6 @@
 from importlib import import_module
 import logging
 import os
-import yaml
 
 
 try:
@@ -10,13 +9,6 @@ try:
     MEETS_REQUIREMENTS = True
 except ImportError:
     MEETS_REQUIREMENTS = False
-
-
-def convert_to_python_obj(string):
-    try:
-        return yaml.load(string)
-    except ValueError:
-        return False
 
 
 def execute_show_command(netmiko_object, command):
@@ -49,20 +41,20 @@ def setup_netmiko_connection(dev_params):
         logging.error("Exception: {}".format(err.message), exc_info=True)
 
 
-def load_hosts_from_file(filename, root_path, delimeter, key):
+def load_hosts_from_file(**kwargs):
     hosts = set()
-    root_path = '.' if not(root_path) else root_path
-    delimeter = ',' if not(delimeter) else delimeter
-    key = 0 if not(key) else key
+    filename, root_path, delimeter, key = [kwargs.get(item) for item in ('filename', 'root_path','delimeter',
+                                                                         'key',)]
     logging.info('{} {} {} {}'.format(filename, root_path, delimeter, key))
+    filename = '/'.join([root_path if root_path else '.', filename])
 
     try:
         with open(filename) as f:
             for line in f:
-                host = line.strip().split(delimeter)[key]
+                host = line.strip().split(delimeter if delimeter else ',')[key if key else 0]
                 hosts.add(host)
     except IOError as err:
-        logging.error('File not found', exc_info=True)
+        logging.error('File not found {}'.format(filename), exc_info=True)
         raise err
     except IndexError:
         logging.error('Key not found')
@@ -76,13 +68,13 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             host=dict(required=False, default=None),
-            host_file=dict(required=False, default=None),
+            host_file=dict(required=False, default=None, type='dict'),
             user=dict(required=False, default=os.getenv('USER')),
             passwd=dict(required=False, default=None),
             device_type=dict(required=False, default='cisco_ios'),
             log_file=dict(required=False, default=None),
             key_file=dict(required=False, default=None),
-            validation_args=dict(required=False, default=None),
+            validation_args=dict(required=False, default=None, type='dict'),
             validate_module=dict(required=False, default=None),
             command=dict(required=True)
         ),
@@ -100,9 +92,11 @@ def main():
     device_output = ''
 
     if args['host_file']:
-        host_file = convert_to_python_obj(args['host_file'])
-        filename, root_path, delimeter, key = host_file[0], host_file[1:2], host_file[2:3], host_file[3:4]
-        hosts = load_hosts_from_file(filename, root_path, delimeter, key)
+        host_file_dict = args['host_file']
+        filename, root_path, delimeter, key = [host_file_dict.get(item) for item in ('filename', 'root_path',
+                                                                                     'delimeter', 'key',)]
+        logging.info(args['host_file'])
+        hosts = load_hosts_from_file(filename=filename, root_path=root_path, delimeter=delimeter, key=key)
     else:
         hosts = [(args['host'])]
 
@@ -113,6 +107,8 @@ def main():
                   "verbose": False}
 
     # snmp validation, yes for device_type
+    # move to own function
+    device_output_dict = {}
     for host in hosts:
         dev_params['ip'] = host
         logging.info("connecting to {}.\nParameters:{}".format(host, dev_params))
@@ -122,19 +118,31 @@ def main():
     logging.info('Final output: {}'.format(device_output))
 
     if args['validate_module']:
-        logging.info('args: {} {}'.format(args['validation_args'], args['validate_module']))
+        logging.info('args: {} validation module{}'.format(args['validation_args'], args['validate_module']))
         run_validator = load_validator(args['validate_module'])
-        run_validator(args['validation_args'], device_output)
+        validation_args = args['validation_args']
+
+        if args['validation_args'].get('csv_file'):
+            validation_args = load_csv_into_array(validation_args['csv_file'])
+
+        if run_validator(validation_args, device_output):
+            module.exit_json(changed=True, msg='All passed, should customize')
 
     result = dict(changed=False, warnings=warnings, stdout_lines=device_output)
     module.exit_json(**result)
 
 
+def load_csv_into_array(csv_file):
+    with open(csv_file) as f:
+        return f.readlines()
+
+
 def load_validator(validate_module):
     folder, library, method = validate_module.split('.')
-    logging.info('{} {} {}'.format(folder, library, method))
+    logging.info('Attempting to import: {} {} {}'.format(folder, library, method))
     try:
         library = import_module('parse_checks.{}.{}'.format(folder, library))
+        logging.info('Import succeeded. Returning: {}'.format(library))
         return getattr(library, method)
     except ImportError as e:
         logging.error('{} does not exist: {}'.format(validate_module, e))

@@ -43,7 +43,7 @@ def setup_netmiko_connection(dev_params):
 
 def load_hosts_from_file(**kwargs):
     hosts = set()
-    filename, root_path, delimeter, key = [kwargs.get(item) for item in ('filename', 'root_path','delimeter',
+    filename, root_path, delimeter, key = [kwargs.get(item) for item in ('filename', 'root_path', 'delimeter',
                                                                          'key',)]
     logging.info('{} {} {} {}'.format(filename, root_path, delimeter, key))
     filename = '/'.join([root_path if root_path else '.', filename])
@@ -97,6 +97,7 @@ def main():
                                                                                      'delimeter', 'key',)]
         logging.info(args['host_file'])
         hosts = load_hosts_from_file(filename=filename, root_path=root_path, delimeter=delimeter, key=key)
+        logging.info('Loading from hosts file. Hosts: {}'.format(hosts))
     else:
         hosts = [(args['host'])]
 
@@ -122,6 +123,7 @@ def main():
         run_validator = load_validator(args['validate_module'])
         validation_args = args['validation_args']
 
+        # should pass into parse checks module?
         if args['validation_args'].get('csv_file'):
             validation_args = load_csv_into_array(validation_args['csv_file'])
 

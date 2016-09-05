@@ -18,7 +18,7 @@ def execute_show_command(netmiko_object, command):
 
     try:
         output = netmiko_object.send_command(command)
-        logging.info('Output: {}'.format(output))
+        logging.info('Device output: {}'.format(output))
         return output
     except Exception as e:
         raise ValueError(e)
@@ -70,7 +70,7 @@ def main():
             host=dict(required=False, default=None),
             host_file=dict(required=False, default=None, type='dict'),
             user=dict(required=False, default=os.getenv('USER')),
-            passwd=dict(required=False, default=None),
+            password=dict(required=False, default=None),
             device_type=dict(required=False, default='cisco_ios'),
             log_file=dict(required=False, default=None),
             key_file=dict(required=False, default=None),
@@ -103,7 +103,7 @@ def main():
 
     dev_params = {"device_type": args['device_type'],
                   "username": args['user'],
-                  "password": args['passwd'],
+                  "password": args['password'],
                   "key_file": args['key_file'],
                   "verbose": False}
 
@@ -116,36 +116,44 @@ def main():
         netmiko_object = setup_netmiko_connection(dev_params)
         device_output_dict[host] = execute_show_command(netmiko_object, args['command'])
 
-    logging.info('Final output: {}'.format(device_output))
+    logging.info('Final output: {}'.format(device_output_dict))
 
     if args['validate_module']:
-        logging.info('args: {} validation module{}'.format(args['validation_args'], args['validate_module']))
+        logging.info('Running validation\nargs: {} validation module{}'.format(args['validation_args'], args['validate_module']))
         run_validator = load_validator(args['validate_module'])
+        logging.info('Validator function: {}'.format(run_validator))
         validation_args = args['validation_args']
 
         # should pass into parse checks module?
         if args['validation_args'].get('csv_file'):
-            validation_args = load_csv_into_array(validation_args['csv_file'])
-
-        if run_validator(validation_args, device_output_dict):
-            module.exit_json(changed=True, msg='All passed, should customize')
-
+            validation_args = load_csv(validation_args['csv_file'])
+        try:
+            logging.info('Passing parameters: {}'.format(validation_args))
+            validation_results = run_validator(device_output_dict, validation_args)
+            logging.info(validation_results)
+            module.exit_json(changed=True, msg=validation_results)
+        except Exception:
+            logging.info('Failed', exc_info=True)
+            exit(1)
     result = dict(changed=False, warnings=warnings, stdout_lines=device_output_dict)
     module.exit_json(**result)
 
 
-def load_csv_into_array(csv_file):
+def load_csv(csv_file):
     with open(csv_file) as f:
-        return f.readlines()
+        return f.read()
 
 
 def load_validator(validate_module):
-    folder, library, method = validate_module.split('.')
-    logging.info('Attempting to import: {} {} {}'.format(folder, library, method))
     try:
-        library = import_module('parse_checks.{}.{}'.format(folder, library))
+        folder, subfolder, library, method = validate_module.split('.')
+        logging.info('Attempting to import: {} {} {} {}'.format(folder, subfolder, library, method))
+        library = import_module('{}.{}.{}'.format(folder, subfolder, library))
         logging.info('Import succeeded. Returning: {}'.format(library))
         return getattr(library, method)
+    except ValueError:
+        logging.error('Could not split validate_module. Provided: {}'.format(validate_module))
+        exit(1)
     except ImportError as e:
         logging.error('{} does not exist: {}'.format(validate_module, e))
         exit(1)

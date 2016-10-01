@@ -96,7 +96,7 @@ except ImportError:
 
 def setup_netmiko_connection(dev_params):
     try:
-        logging.info("connecting to {}".format(dev_params)
+        logging.info("connecting to {}".format(dev_params))
         return netmiko.ConnectHandler(**dev_params)
     except Exception as err:
         logging.error("Exception: {}".format(err.message), exc_info=True)

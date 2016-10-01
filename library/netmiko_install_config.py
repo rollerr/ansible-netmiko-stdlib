@@ -131,13 +131,16 @@ def install_config(module, netmiko_object):
 
     logging.info("loading %s", config_file)
     if netmiko_object.device_type in commit_os:
-        std_out = netmiko_object.send_config_from_file(config_file=config_file, exit_config_mode=False)
+        logging.info("pushing config to device: {}".format(netmiko_object.host))
+        results['std_out'] = netmiko_object.send_config_from_file(config_file=config_file, exit_config_mode=False)
+        logging.info("successfully pushed changes to: {}".format(netmiko_object.host))
         netmiko_object.commit()
+        logging.info("commited changes on: {}".format(netmiko_object.host))
+        results['changed'] = True
 
-    results['changed'] = True
 
     netmiko_object.exit_config_mode()
-    return (results, std_out)
+    return results
 
 def diff_config(cfg_old, cfg_new):
     """performs a diff on `cfg_old` and `cfg_new`, returning the resulting
@@ -168,7 +171,7 @@ def load(module):
 
     netmiko_object = setup_netmiko_connection(dev_params)
 
-    std_out, results = install_config(module, netmiko_object)
+    results = install_config(module, netmiko_object)
     if args['diff_file']:
         new_config = get_config(dev)
         diff = diff_config(original_config, new_config)
@@ -182,6 +185,7 @@ def load(module):
                     logging.error("Exception: %s", err.message)
                     raise err
 
+    results = dict(changed=results['change'], warnings=None, stdout_lines=results['std_out'])
     module.exit_json(**results)
 
 

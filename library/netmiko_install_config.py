@@ -96,6 +96,7 @@ except ImportError:
 
 def setup_netmiko_connection(dev_params):
     try:
+        logging.info("connecting to {}".format(dev_params)
         return netmiko.ConnectHandler(**dev_params)
     except Exception as err:
         logging.error("Exception: {}".format(err.message), exc_info=True)
@@ -157,7 +158,6 @@ def load(module):
 
     setup_logging(args)
 
-    logging.info("connecting to %s", args['host'])
     dev_params = {"device_type": args['device_type'],
                   "ip": args['host'],
                   "username": args['user'],

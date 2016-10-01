@@ -122,6 +122,7 @@ def install_config(module, netmiko_object):
     """Installs a complete or partial configuration on an IOS-like device by
     sending commands one at a time to the remote device.
     """
+    commit_os = ('vyos',)
     args = module.params
     results = {}
     config_file = os.path.abspath(args['file'])
@@ -129,10 +130,10 @@ def install_config(module, netmiko_object):
     results['changed'] = False
 
     logging.info("loading %s", config_file)
+    if netmiko_object.device_type in commit_os:
+        std_out = netmiko_object.send_config_from_file(config_file=config_file, exit_config_mode=False)
+        netmiko_object.commit()
 
-    std_out = netmiko_object.send_config_from_file(config_file=config_file)
-    # if vyos
-    netmiko_object.commit()
     results['changed'] = True
 
     netmiko_object.exit_config_mode()

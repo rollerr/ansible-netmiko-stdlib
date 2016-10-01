@@ -127,11 +127,17 @@ def main():
         # should pass into parse checks module?
         if args['validation_args'].get('csv_file'):
             validation_args = load_csv(validation_args['csv_file'])
+
         try:
             logging.info('Passing parameters: {}'.format(validation_args))
             validation_results = run_validator(device_output_dict, validation_args)
             logging.info(validation_results)
-            module.exit_json(changed=True, msg=validation_results)
+
+            if validation_results.get('pass'):
+                module.exit_json(changed=True, msg=validation_results.get('message'))
+            else:
+                module.fail_json(changed=False, msg=validation_results.get('message'))
+
         except Exception:
             logging.info('Failed', exc_info=True)
             exit(1)

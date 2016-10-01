@@ -1,3 +1,5 @@
+# setup this with using netmiko_command connect. have to insert a commit after sending file
+
 #!/usr/bin/env python2.7
 """This module uses Ansible to deploy device configurations and provide diffs
 across many vendors.
@@ -92,13 +94,30 @@ except ImportError:
     MEETS_REQUIREMENTS = False
 
 
+def setup_netmiko_connection(dev_params):
+    try:
+        return netmiko.ConnectHandler(**dev_params)
+    except Exception as err:
+        logging.error("Exception: {}".format(err.message), exc_info=True)
+
+
+def setup_logging(args):
+
+    logfile = args['log_file']
+
+    if logfile is not None:
+        logging.basicConfig(filename=logfile, level=logging.INFO,
+                            format='%(asctime)s:%(name)s:%(message)s')
+        logging.getLogger().name = 'CONFIG:'
+
+
 def get_config(dev):
     """Returns the current configuration of an IOS-like device that supports
     `show running-config`
     """
     return dev.send_command("show running-config")
 
-def install_config(module, dev):
+def install_config(module, netmiko_object):
     """Installs a complete or partial configuration on an IOS-like device by
     sending commands one at a time to the remote device.
     """
@@ -110,18 +129,13 @@ def install_config(module, dev):
 
     logging.info("loading %s", config_file)
 
-    try:
-        if not dev.check_enable_mode():
-            dev.enable()
-        # NetMiko automatically enters config mode, but not enable mode
-        dev.send_config_from_file(config_file=config_file)
-        results['changed'] = True
-    except Exception as err:
-        logging.error("Exception: %s", err.message)
-        raise err
+    std_out = netmiko_object.send_config_from_file(config_file=config_file)
+    # if vyos
+    netmiko_object.commit()
+    results['changed'] = True
 
-    dev.exit_config_mode()
-    return results
+    netmiko_object.exit_config_mode()
+    return (results, std_out)
 
 def diff_config(cfg_old, cfg_new):
     """performs a diff on `cfg_old` and `cfg_new`, returning the resulting
@@ -141,10 +155,7 @@ def load(module):
     args = module.params
     logfile = args['log_file']
 
-    if logfile is not None:
-        logging.basicConfig(filename=logfile, level=logging.INFO,
-                            format='%(asctime)s:%(name)s:%(message)s')
-        logging.getLogger().name = 'CONFIG:' + args['host']
+    setup_logging(args)
 
     logging.info("connecting to %s", args['host'])
     dev_params = {"device_type": args['device_type'],
@@ -154,17 +165,9 @@ def load(module):
                   "key_file": args['key_file'],
                   "verbose": False}
 
-    try:
-        dispatcher = netmiko.ssh_dispatcher(device_type=args['device_type'])
-        dev = dispatcher(**dev_params)
-    except Exception as err:
-        logging.error("Exception: %s", err.message)
-        raise err
+    netmiko_object = setup_netmiko_connection(dev_params)
 
-    if args['diff_file']:
-        original_config = get_config(dev)
-
-    results = install_config(module, dev)
+    std_out, results = install_config(module, netmiko_object)
     if args['diff_file']:
         new_config = get_config(dev)
         diff = diff_config(original_config, new_config)

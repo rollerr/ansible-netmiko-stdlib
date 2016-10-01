@@ -185,7 +185,7 @@ def load(module):
                     logging.error("Exception: %s", err.message)
                     raise err
 
-    results = dict(changed=results['change'], warnings=None, stdout_lines=results['std_out'])
+    results = dict(changed=results['changed'], warnings=None, stdout_lines=results['std_out'])
     module.exit_json(**results)
 
 

@@ -147,7 +147,7 @@ def install_config(module, netmiko_object):
         netmiko_object.exit_config_mode()
         logging.info("Exited config mode on: {}".format(netmiko_object.host))
 
-    results['meta'] = changed_message.format(netmiko_object.host)
+    results['meta'] = {"hello": changed_message.format(netmiko_object.host)}
 
     return results
 

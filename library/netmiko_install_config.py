@@ -123,23 +123,32 @@ def install_config(module, netmiko_object):
     sending commands one at a time to the remote device.
     """
     commit_os = ('vyos',)
+    not_commited_string = ('No configuration changes to commit',)
     args = module.params
     results = {}
     config_file = os.path.abspath(args['file'])
     results['file'] = config_file
     results['changed'] = False
+    changed_message = 'A diff was not detected on {}. No changes to commit'
 
     logging.info("loading %s", config_file)
     if netmiko_object.device_type in commit_os:
         logging.info("pushing config to device: {}".format(netmiko_object.host))
         results['std_out'] = netmiko_object.send_config_from_file(config_file=config_file, exit_config_mode=False)
-        logging.info("successfully pushed changes to: {}".format(netmiko_object.host))
-        netmiko_object.commit()
-        logging.info("commited changes on: {}".format(netmiko_object.host))
-        results['changed'] = True
+        logging.info("pushed changes to: {}".format(netmiko_object.host))
+        commit_results = netmiko_object.commit()
+
+        if not_commited_string[0] not in commit_results:
+            changed_message = 'Changes were commited to {}'.format(netmiko_object.host)
+            logging.info(changed_message)
+            results['changed'] = True
 
 
-    netmiko_object.exit_config_mode()
+        netmiko_object.exit_config_mode()
+        logging.info("Exited config mode on: {}".format(netmiko_object.host))
+
+    results['meta'] = changed_message.format(netmiko_object.host)
+
     return results
 
 def diff_config(cfg_old, cfg_new):

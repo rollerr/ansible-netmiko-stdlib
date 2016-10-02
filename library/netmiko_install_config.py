@@ -129,7 +129,7 @@ def install_config(module, netmiko_object):
     config_file = os.path.abspath(args['file'])
     results['file'] = config_file
     results['changed'] = False
-    changed_message = 'A diff was not detected on {}. No changes to commit'
+    changed_message = 'A diff was not detected on {}. No changes to commit'.format(netmiko_object.host)
 
     logging.info("loading %s", config_file)
     if netmiko_object.device_type in commit_os:

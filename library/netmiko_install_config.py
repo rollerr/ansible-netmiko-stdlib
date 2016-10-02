@@ -140,10 +140,9 @@ def install_config(module, netmiko_object):
 
         if not_commited_string[0] not in commit_results:
             changed_message = 'Changes were commited to {}'.format(netmiko_object.host)
-            logging.info(changed_message)
             results['changed'] = True
 
-
+        logging.info(changed_message)
         netmiko_object.exit_config_mode()
         logging.info("Exited config mode on: {}".format(netmiko_object.host))
 

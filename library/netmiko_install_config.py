@@ -135,9 +135,10 @@ def install_config(module, netmiko_object):
     logging.info("loading %s", config_file)
     if netmiko_object.device_type in commit_os:
         logging.info("pushing config to device: {}".format(netmiko_object.host))
-        results['std_out'] = netmiko_object.send_config_from_file(config_file=config_file, exit_config_mode=False)
+        results['std_out'] = netmiko_object.send_config_from_file(config_file=config_file)
         if commit_failures[0] in results['std_out']:
-            results['warnings'].append(results['std_out'])
+            pass
+        logging.info(results['std_out'])
         logging.info("pushed changes to: {}".format(netmiko_object.host))
         commit_results = netmiko_object.commit()
 
@@ -146,6 +147,9 @@ def install_config(module, netmiko_object):
         if not_commited_string[0] not in commit_results:
             changed_message = 'Changes were commited to {}'.format(netmiko_object.host)
             results['changed'] = True
+
+        save_results = netmiko_object.send_command('save')
+        logging.info(save_results)
 
         logging.info(changed_message)
         netmiko_object.exit_config_mode()

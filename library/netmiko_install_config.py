@@ -124,6 +124,7 @@ def install_config(module, netmiko_object):
     """
     commit_os = ('vyos',)
     not_commited_string = ('No configuration changes to commit',)
+    commit_failures = ('Set failed',)
     args = module.params
     results = {}
     config_file = os.path.abspath(args['file'])
@@ -135,8 +136,12 @@ def install_config(module, netmiko_object):
     if netmiko_object.device_type in commit_os:
         logging.info("pushing config to device: {}".format(netmiko_object.host))
         results['std_out'] = netmiko_object.send_config_from_file(config_file=config_file, exit_config_mode=False)
+        if commit_failures[0] in results['std_out']:
+            results['warnings'].append(results['std_out'])
         logging.info("pushed changes to: {}".format(netmiko_object.host))
         commit_results = netmiko_object.commit()
+
+        logging.info(commit_results)
 
         if not_commited_string[0] not in commit_results:
             changed_message = 'Changes were commited to {}'.format(netmiko_object.host)
